@@ -1,0 +1,42 @@
+@startuml CinemaAbyss_ToBe_Architecture
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+
+Person(user, "Пользователь", "Смотрит фильмы, управляет подпиской")
+
+System_Boundary(cinema_system, "Кинобездна (To-Be)") {
+    Container(api_gateway, "API Gateway", "Nginx", "Единая точка входа, маршрутизация")
+    Container(proxy_service, "Proxy Service", "Go", "Паттерн Strangler Fig") {
+        Container(proxy_feature, "Feature Flags", "", "Управление % трафика")
+    }
+    
+    Container(movies_service, "Movies Service", "Go", "Метаданные о фильмах")
+    Container(events_service, "Events Service", "Go", "Обработка событий Kafka") {
+        Container(events_producer, "Producer", "", "Создание событий")
+        Container(events_consumer, "Consumer", "", "Чтение событий")
+    }
+    
+    ContainerQueue(kafka, "Kafka", "Асинхронная коммуникация") {
+        Container(topic_user, "user-events", "Топик")
+        Container(topic_payment, "payment-events", "Топик")
+        Container(topic_movie, "movie-events", "Топик")
+    }
+    
+    ContainerDb(postgresql, "PostgreSQL", "Хранилище данных")
+}
+
+System_Ext(legacy_system, "Legacy Monolith", "Старый монолит")
+System_Ext(k8s_cluster, "Kubernetes", "Оркестрация сервисов")
+
+Rel(user, api_gateway, "HTTPS", "API calls")
+Rel(api_gateway, proxy_service, "HTTP", "Роутинг запросов")
+Rel(proxy_service, movies_service, "HTTP", "Новый сервис")
+Rel(proxy_service, legacy_system, "HTTP", "Старый монолит")
+
+Rel(events_service, kafka, "Pub/Sub", "События")
+Rel(movies_service, postgresql, "SQL", "Movies DB")
+
+Rel(proxy_service, events_service, "HTTP", "Отправка событий")
+Rel(proxy_service, k8s_cluster, "API", "Управление feature flags")
+
+@enduml
